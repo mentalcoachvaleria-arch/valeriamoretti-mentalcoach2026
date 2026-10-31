@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<url>
+        <loc>https://mentalcoachvaleria.it/</loc>
+		<lastmod>2026-10-30-T21:27:04+01:00</lastmod>
+		<changefreq>daily</changefreq>
+		<priority>1</priority>
+	</url>
+	<url>
+		<loc>https://localhost/terminiecondizioni</loc>
+		<lastmod>2026-10-30-T21:27:04+01:00</lastmod>
+		<changefreq>daily</changefreq>
+		<priority>1</priority>
+	</url>
+	<url>
+		<loc>https://localhost/privacy-policy</loc>
+		<lastmod>2026-10-30-T21:27:04+01:00</lastmod>
+		<changefreq>daily</changefreq>
+		<priority>1</priority>
+	</url>
+	<url>
+		<loc>https://localhost/cookie-policy</loc>
+		<lastmod>2026-10-30-T21:27:04+01:00</lastmod>
+		<changefreq>daily</changefreq>
+		<priority>1</priority>
+	</url>
+	<url>
+		<loc>https://localhost/admin</loc>
+		<lastmod>2026-10-30-T21:27:04+01:00</lastmod>
+		<changefreq>daily</changefreq>
+		<priority>1</priority>
+	</url>
+</urlset>
