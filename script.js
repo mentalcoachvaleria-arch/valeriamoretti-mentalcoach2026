@@ -21,6 +21,9 @@
   let quizLetterCounts = {};
   // Esito del calcolo della lettera prevalente { counts, max, winners[] }
   let quizDominantResult = null;
+  // Risultato in sospeso { letter, text }: viene mostrato DOPO il modulo dati
+  // compilato (flusso: domande → modulo → risultato + "Prenota una consulenza")
+  let quizPendingResult = null;
   let contactCurrentStep = 1;
   // Step fissi del modulo contatto: nome, cognome, email, telefono, messaggio, servizio, privacy
   let contactFixedSteps = 7;
@@ -1418,14 +1421,15 @@
     }
   }
 
-  function openContactModal(templateId, serviceName) {
+  function openContactModal(templateId, serviceName, opts) {
     const modal = document.getElementById('contact-modal');
     if (!modal) return;
+    const keepOtherModalOpen = !!(opts && opts.keepOtherModalOpen);
     // Prima si azzera il modulo (compreso il messaggio preimpostato), poi si
     // seleziona il servizio: così "Pacchetto scelto: …" resta scritto nel messaggio.
     if (window.resetContactForm) window.resetContactForm();
     setSelectedService(serviceName || '');
-    if (activeModal) {
+    if (activeModal && !keepOtherModalOpen) {
       const currentModal = document.getElementById(activeModal);
       if (currentModal) { currentModal.classList.remove('active'); document.body.classList.remove('modal-open'); document.body.style.top = ''; }
     }
@@ -1448,13 +1452,18 @@
     modal.classList.remove('active');
     modal.setAttribute('hidden', ''); // nasconde davvero il popup (attributo hidden)
     document.removeEventListener('keydown', handleContactEscapeKey);
+    // Se era aperto anche il popup del test (modulo prenota aperto dal test),
+    // si resta dentro il popup del test: niente scroll della pagina sottostante.
+    const quizStillOpen = document.getElementById('quiz-modal')?.classList.contains('active');
     setTimeout(() => {
       const scrollY = document.documentElement.style.getPropertyValue('--scroll-y');
-      document.body.classList.remove('modal-open');
-      document.body.style.top = '';
-      if (scrollY) window.scrollTo(0, parseInt(scrollY) || 0);
-      document.documentElement.style.removeProperty('--scroll-y');
-      if (activeModal === 'contact-modal') activeModal = null;
+      if (!quizStillOpen) {
+        document.body.classList.remove('modal-open');
+        document.body.style.top = '';
+        if (scrollY) window.scrollTo(0, parseInt(scrollY) || 0);
+        document.documentElement.style.removeProperty('--scroll-y');
+      }
+      if (activeModal === 'contact-modal') activeModal = quizStillOpen ? 'quiz-modal' : null;
     }, 400);
   }
 
@@ -1569,6 +1578,9 @@
     if (questionContainer) questionContainer.classList.add('hidden');
     if (titleEl) titleEl.textContent = 'Il tuo risultato: ' + letter;
     if (descEl) descEl.textContent = text;
+    // Il modulo dati è già stato compilato PRIMA del risultato: si nasconde qui.
+    const contactSection = document.getElementById('quiz-contact-section');
+    if (contactSection) contactSection.classList.add('hidden');
     if (resultContainer) { resultContainer.hidden = false; resultContainer.classList.add('visible'); }
     setQuizHeader(false);
     const counter = document.getElementById('quiz-step-counter');
@@ -1579,9 +1591,12 @@
 
   function hideQuizAutoResult() {
     const resultContainer = document.getElementById('quiz-result-container');
-    if (resultContainer) resultContainer.classList.remove('visible');
+    if (resultContainer) { resultContainer.classList.remove('visible'); resultContainer.hidden = true; }
   }
 
+  // Step "I tuoi dati": il modulo da compilare compare PRIMA del risultato.
+  // Al termine dell'invio verrà mostrato il risultato (showQuizAutoResult /
+  // showQuizSuccessState), con sotto il bottone "Prenota una consulenza".
   function goQuizContactStep() {
     const questionContainer = document.getElementById('quiz-question-container');
     const contactSection = document.getElementById('quiz-contact-section');
@@ -1644,24 +1659,50 @@
 
   function showQuizResults() {
     // RISPOSTA AUTOMATICA: al termine del test si conta quale opzione
-    // (A, B, C o D) è stata selezionata più frequentemente e si mostra la
+    // (A, B, C o D) è stata selezionata più frequentemente e si memorizza la
     // risposta configurata nella Dashboard Admin per quella lettera.
+    // Il risultato NON viene mostrato subito: prima l'utente compila il modulo
+    // dati ("I tuoi dati"); il risultato apparirà dopo l'invio del modulo.
     const res = computeQuizDominantLetter();
     quizDominantResult = res; // memorizzato: viene inviato anche via EmailJS
-    const autoAnswers = window.__quizAutoAnswers || {};
     if (res.winners.length === 1) {
       const letter = res.winners[0];
-      const text = (autoAnswers[letter] || '').trim();
-      if (text) {
-        showQuizAutoResult(letter, text);
-        return; // il modulo dati resta visibile sotto il risultato
-      }
+      const text = ((window.__quizAutoAnswers || {})[letter] || '').trim();
+      quizPendingResult = text ? { letter, text } : null;
+    } else {
+      quizPendingResult = null;
     }
-    // Nessun risultato univoco (nessuna risposta / pareggio tra due o più
-    // lettere con lo stesso punteggio massimo) oppure risposta non ancora
-    // configurata nella dashboard: nessun risultato assegnato arbitrariamente,
-    // si prosegue direttamente con il modulo dati come prima.
     goQuizContactStep();
+  }
+
+  // Mostra lo stato "inviato": se c'è un risultato in sospeso lo mostra sopra
+  // il messaggio di conferma, con sotto il bottone "Prenota una consulenza".
+  function showQuizSuccessState(message) {
+    const contactSection = document.getElementById('quiz-contact-section');
+    const successState = document.getElementById('quiz-success');
+    const resultContainer = document.getElementById('quiz-result-container');
+    const titleEl = document.getElementById('quiz-result-title');
+    const descEl = document.getElementById('quiz-result-description');
+    const msgEl = document.getElementById('quiz-success-message');
+    if (contactSection) contactSection.classList.add('hidden');
+    setQuizHeader(false);
+    const counterS = document.getElementById('quiz-step-counter');
+    if (counterS) { counterS.style.display = ''; counterS.textContent = 'Risultato del test'; }
+    if (msgEl && message) msgEl.textContent = message;
+    if (quizPendingResult && resultContainer) {
+      // Risultato visibile insieme alla conferma di avvenuto invio
+      if (titleEl) titleEl.textContent = 'Il tuo risultato: ' + quizPendingResult.letter;
+      if (descEl) descEl.textContent = quizPendingResult.text;
+      resultContainer.hidden = false;
+      resultContainer.classList.add('visible');
+    } else if (resultContainer) {
+      resultContainer.classList.remove('visible');
+      resultContainer.hidden = true;
+      if (counterS) counterS.textContent = 'Invio completato';
+    }
+    if (successState) successState.classList.add('visible');
+    const box = document.querySelector('.quiz-modal-container');
+    if (box) setTimeout(() => box.scrollTo({ top: 0, behavior: 'smooth' }), 250);
   }
 
   function validateQuizContactForm() {
@@ -1735,24 +1776,19 @@
     };
     emailjs.send('service_wnyvmph', 'template_wqnveql', templateParams)
       .then(function() {
-        const contactSection = document.getElementById('quiz-contact-section');
-        const successState = document.getElementById('quiz-success');
-        if (contactSection) contactSection.classList.add('hidden');
-        setQuizHeader(false);
-        const counterS = document.getElementById('quiz-step-counter');
-        if (counterS) { counterS.style.display = ''; counterS.textContent = 'Invio completato'; }
-        if (successState) successState.classList.add('visible');
+        // Flusso richiesto: domande → modulo dati compilato → RISULTATO del test
+        // → sotto il bottone "Prenota una consulenza" (apre il modulo prenota).
+        showQuizSuccessState('Grazie! I tuoi dati sono stati inviati. Riceverai la risposta entro 24 ore nella tua email.');
         // Pulisce le risposte e i dati del modulo dopo l'invio
         const quizForm = document.getElementById('quiz-contact-form');
         if (quizForm) quizForm.reset();
         quizCurrentStep = 0;
         quizUserAnswers = [];
         quizLetterCounts = {};
-        quizDominantResult = null;
+        // NOTA: quizDominantResult e quizPendingResult NON vengono azzerati qui:
+        // servono per mostrare il risultato; si azzerano in resetQuiz (nuovo test).
         ['quiz-error-name','quiz-error-email','quiz-error-message','quiz-error-phone'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=''; });
         document.querySelectorAll('#quiz-contact-form label.error').forEach(l => l.classList.remove('error'));
-        const box = document.querySelector('.quiz-modal-container');
-        if (box) box.scrollTo({ top: 0, behavior: 'smooth' });
         submitBtn.innerHTML = originalBtnContent;
         submitBtn.disabled = false;
         if (typeof fbq === 'function') fbq('track', 'Lead');
@@ -1769,7 +1805,7 @@
     const modal = document.getElementById('quiz-modal');
     if (!modal) return;
     modal.hidden = false;
-    if (activeModal) {
+    if (activeModal && activeModal !== 'quiz-modal') {
       const currentModal = document.getElementById(activeModal);
       if (currentModal) { currentModal.classList.remove('active'); document.body.classList.remove('modal-open'); document.body.style.top = ''; }
     }
@@ -1826,14 +1862,45 @@
     quizUserAnswers = [];
     quizLetterCounts = {};
     quizDominantResult = null;
+    quizPendingResult = null; // nessun risultato in sospeso: si riparte dalle domande
     hideQuizAutoResult();
-    const questionContainer = document.getElementById('quiz-question-container');
-    const contactSection = document.getElementById('quiz-contact-section');
     const successState = document.getElementById('quiz-success');
     if (successState) successState.classList.remove('visible');
+    const questionContainer = document.getElementById('quiz-question-container');
+    if (questionContainer) questionContainer.classList.remove('hidden');
     // renderQuizQuestion() decide da solo cosa mostrare: le domande create nella
     // dashboard oppure, se non ce ne sono, direttamente il modulo dati.
     renderQuizQuestion();
+  }
+
+  // Apre il modulo di prenotazione (stesso modulo del pulsante "Prenota" della
+  // navbar) a partire dal popup del test. Il popup del test RESTA APERTO dietro:
+  // così i campi compilati rimangono visibili e i dati servono a precompilare
+  // il modulo prenota, senza perdere nulla se l'utente torna indietro.
+  function openBookingFromQuiz() {
+    const nameEl = document.getElementById('quiz-contact-name');
+    const emailEl = document.getElementById('quiz-contact-email');
+    const phoneEl = document.getElementById('quiz-contact-phone');
+    const fullName = ((nameEl && nameEl.value) || '').trim();
+    const email = ((emailEl && emailEl.value) || '').trim();
+    const phone = ((phoneEl && phoneEl.value) || '').trim();
+    // Ricorda quale popup era aperto, per poterlo richiudere correttamente
+    quizModalWasActive = activeModal === 'quiz-modal';
+    openContactModal('template_86ls76q', 'Consulenza post-test');
+    // Precompila i dati già inseriti nel test, così non deve riscriverli
+    const nome = document.getElementById('contact-nome');
+    const cognome = document.getElementById('contact-cognome-input');
+    const mail = document.getElementById('contact-email');
+    const tel = document.getElementById('contact-phone');
+    if (nome && !nome.value.trim()) {
+      const parts = fullName.split(/\s+/).filter(Boolean);
+      nome.value = parts[0] || '';
+      if (cognome && !cognome.value.trim()) cognome.value = parts.slice(1).join(' ');
+    }
+    if (mail && !mail.value.trim() && email) mail.value = email;
+    if (tel && !tel.value.trim() && phone) tel.value = phone;
+    const modal = document.getElementById('contact-modal');
+    if (modal) setTimeout(() => { const firstInput = modal.querySelector('.cs-step.active input:not([type=hidden]), .cs-step.active textarea'); if (firstInput) firstInput.focus(); }, 150);
   }
 
   function initQuizModal() {
@@ -1872,6 +1939,15 @@
     if (quizCloseBtn) quizCloseBtn.addEventListener('click', closeQuizModal);
     const quizSuccessCloseBtn = document.getElementById('quiz-success-close-btn');
     if (quizSuccessCloseBtn) quizSuccessCloseBtn.addEventListener('click', closeQuizModal);
+    // Bottoni "Prenota una consulenza" nel popup del test: aprono il modulo prenota.
+    // Il form del test viene tenuto aperto finché l'utente non chiude il popup,
+    // così i campi restano visibili e i dati servono a precompilare il modulo.
+    document.querySelectorAll('#quiz-book-consultation-btn, #quiz-book-consultation-btn-2').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        openBookingFromQuiz();
+      });
+    });
     const quizModal = document.getElementById('quiz-modal');
     if (quizModal) quizModal.addEventListener('click', function(e) { if (e.target === quizModal) closeQuizModal(); });
     const quizContactForm = document.getElementById('quiz-contact-form');

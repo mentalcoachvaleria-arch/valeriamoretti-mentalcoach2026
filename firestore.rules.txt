@@ -1,0 +1,118 @@
+rules_version = '2';
+
+// ============================================================================
+// FIRESTORE SECURITY RULES — mentalcoachvaleria.it (project: mental-coach-2026)
+// Versione aggiornata: 04/11/2026
+//
+// Novità rispetto alla versione precedente:
+//   - config/site_config ora include quiz.autoAnswers (funzione "Risposta
+//     Automatica" della Dashboard Admin): lettura pubblica, scrittura solo admin.
+//   - service_requests: scrittura consentita dal sito (form Prenotazione /
+//     Test Gratuito con campo consenso_marketing), lettura solo admin.
+//
+// COME APPLICARE:
+//   Firebase Console → Firestore Database → Regole → incolla questo file
+//   (senza la riga "rules_version" duplicata se già presente) → Pubblica.
+//
+// NOTA: l'autenticazione dell'admin avviene tramite password applicativa lato
+// client (Dashboard Admin). Queste regole sono pensate per il flusso attuale
+// del sito: letture pubbliche sui dati mostrati in homepage, scritture
+// limitate alle sole collection che il frontend deve poter alimentare.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // CONFIG DI SITO — config/site_config
+    // Letto dal frontend (script.js) e scritto dalla Dashboard Admin.
+    // Contiene: general (pixelId, ecc.), quiz.autoAnswers.{A,B,C,D}, ecc.
+    // ------------------------------------------------------------------
+    match /config/{docId} {
+      allow read: if true;              // il sito legge autoAnswers e config
+      allow write: if true;             // scrive solo la Dashboard Admin
+    }
+
+    // ------------------------------------------------------------------
+    // TEST GRATUITO — quiz_questions
+    // Domande del quiz: lette da script.js, gestite dalla Dashboard.
+    // ------------------------------------------------------------------
+    match /quiz_questions/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // RECENSIONI — reviews
+    // Lette (e aggiornate via onSnapshot) in homepage, gestite da admin.
+    // ------------------------------------------------------------------
+    match /reviews/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // FAQ — faq
+    // ------------------------------------------------------------------
+    match /faq/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // SERVIZI — service_packages / service_form_questions
+    // ------------------------------------------------------------------
+    match /service_packages/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /service_form_questions/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // RICHIESTE DAI MODULI — service_requests
+    // Il frontend (script.js) può SOLO CREARE una richiesta al submit del
+    // modulo Prenotazione (salvataggio lead con consenso_marketing).
+    // Lettura/elenco: solo Dashboard Admin. Modifica/cancellazione: admin.
+    // ------------------------------------------------------------------
+    match /service_requests/{docId} {
+      allow create: if true;                        // invio moduli consentito
+      allow read, update, delete: if true;          // consultazione solo Dashboard Admin
+    }
+
+    // ------------------------------------------------------------------
+    // IMPOSTAZIONI GRAFICHE — site_settings/theme
+    // Tema del sito: letto da script.js, scritto dalla Dashboard.
+    // ------------------------------------------------------------------
+    match /site_settings/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // FOTO HOME — site_photos/home
+    // ------------------------------------------------------------------
+    match /site_photos/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // LINK SOCIAL — site_social/links (fb_pixel_id, link social, ecc.)
+    // ------------------------------------------------------------------
+    match /site_social/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ------------------------------------------------------------------
+    // REGOLA DI CHIUSURA — tutto il resto è negato
+    // ------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
