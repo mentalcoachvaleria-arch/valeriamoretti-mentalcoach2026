@@ -410,6 +410,10 @@
     .opt-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .opt-row input[type=text] { flex: 1; }
     .opt-row .profile-sel { width: 130px; flex: none; }
+    /* Box "Risposta Automatica" (sezione Test gratuito) */
+    .auto-answer-box { border: 1.5px solid #e7e0d2; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: #fff; }
+    .auto-answer-box label { display: block; margin-bottom: 6px; font-size: 13px; }
+    .auto-answer-box textarea { width: 100%; resize: vertical; }
     .icon-btn { background: transparent; border: none; color: var(--grigio); font-size: 14px; padding: 6px; border-radius: 6px; }
     .icon-btn:hover { background: #eee7d9; color: var(--danger); }
 
@@ -937,6 +941,32 @@
           <h3><i class="fa-solid fa-sliders"></i> Elenco delle domande (<span id="quiz-count">0</span>)</h3>
           <div id="questions-list"></div>
           <p class="empty-note" id="questions-empty" hidden>Nessuna domanda attiva. Crea la prima qui sotto.</p>
+        </div>
+
+        <div class="card">
+          <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Risposta Automatica</h3>
+          <p style="font-size:12.5px;color:var(--grigio);margin-bottom:14px;">Scrivi qui le quattro risposte personalizzate, una per ciascuna opzione del test (A, B, C, D). Al termine del test il sito conta quale lettera è stata selezionata più frequentemente e mostra automaticamente all'utente la risposta corrispondente. Tutto ciò che salvi qui finisce nel database (Firebase): puoi modificarlo quando vuoi, senza toccare il codice. In caso di pareggio tra due o più lettere con lo stesso punteggio massimo non viene mostrato alcun risultato.</p>
+          <div id="auto-answer-editor">
+            <div class="auto-answer-box">
+              <label for="auto-answer-a"><strong>Risposta A</strong></label>
+              <textarea id="auto-answer-a" rows="3" placeholder="Testo mostrato agli utenti quando prevale l'opzione A…"></textarea>
+            </div>
+            <div class="auto-answer-box">
+              <label for="auto-answer-b"><strong>Risposta B</strong></label>
+              <textarea id="auto-answer-b" rows="3" placeholder="Testo mostrato agli utenti quando prevale l'opzione B…"></textarea>
+            </div>
+            <div class="auto-answer-box">
+              <label for="auto-answer-c"><strong>Risposta C</strong></label>
+              <textarea id="auto-answer-c" rows="3" placeholder="Testo mostrato agli utenti quando prevale l'opzione C…"></textarea>
+            </div>
+            <div class="auto-answer-box">
+              <label for="auto-answer-d"><strong>Risposta D</strong></label>
+              <textarea id="auto-answer-d" rows="3" placeholder="Testo mostrato agli utenti quando prevale l'opzione D…"></textarea>
+            </div>
+          </div>
+          <div class="row" style="margin-top:16px;">
+            <button type="button" class="btn btn--primary" id="btn-save-auto-answers"><i class="fa-solid fa-floppy-disk"></i> Salva risposte automatiche</button>
+          </div>
         </div>
 
         <div class="card">

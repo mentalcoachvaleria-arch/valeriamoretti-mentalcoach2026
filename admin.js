@@ -577,11 +577,47 @@
     finally { setBusy(false); }
   }
 
+  /* --- Risposta Automatica: le 4 risposte A–D configurate dall'admin ---
+     Salvate in Firestore: collection 'config', documento 'site_config',
+     campo quiz.autoAnswers = { A, B, C, D }. Il sito pubblico legge lo
+     stesso documento e mostra la risposta della lettera prevalente. */
+  const AUTO_ANSWER_FIELDS = { A: '#auto-answer-a', B: '#auto-answer-b', C: '#auto-answer-c', D: '#auto-answer-d' };
+
+  async function loadAutoAnswers() {
+    try {
+      const snap = await FB.getDoc(FB.doc(FB.db, CONFIG_COL, CONFIG_DOC));
+      const cfg = snap.exists() ? snap.data() : {};
+      const auto = (cfg.quiz && cfg.quiz.autoAnswers) || {};
+      Object.keys(AUTO_ANSWER_FIELDS).forEach(L => {
+        const el = $(AUTO_ANSWER_FIELDS[L]);
+        if (el) el.value = auto[L] || '';
+      });
+    } catch (e) { console.warn('loadAutoAnswers:', e); }
+  }
+
+  async function saveAutoAnswers() {
+    const auto = {};
+    for (const L of Object.keys(AUTO_ANSWER_FIELDS)) {
+      const el = $(AUTO_ANSWER_FIELDS[L]);
+      auto[L] = el ? el.value.trim() : '';
+    }
+    setBusy(true);
+    try {
+      // merge:true → aggiorna solo quiz.autoAnswers, senza toccare gli altri campi di config
+      await FB.setDoc(FB.doc(FB.db, CONFIG_COL, CONFIG_DOC), { quiz: { autoAnswers: auto } }, { merge: true });
+      toast('Risposte automatiche salvate: il sito le mostra al termine del test.');
+    } catch (err) { console.error(err); toast(permHint(err, 'dati'), true); }
+    finally { setBusy(false); }
+  }
+
   function initQuizSection() {
     resetQuestionForm();
     $('#question-form').addEventListener('submit', saveQuestion);
     $('#q-cancel-edit').addEventListener('click', resetQuestionForm);
     $('#btn-add-option').addEventListener('click', () => $('#options-editor').appendChild(optionRow()));
+    const btnAuto = $('#btn-save-auto-answers');
+    if (btnAuto) btnAuto.addEventListener('click', saveAutoAnswers);
+    loadAutoAnswers();
     $('#questions-list').addEventListener('click', (e) => {
       const t = e.target.closest('button');
       if (!t) return;

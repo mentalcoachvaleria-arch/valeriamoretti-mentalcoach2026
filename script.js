@@ -17,6 +17,10 @@
   // I profili A–D e il calcolo del punteggio sono stati rimossi: il test
   // gratuito contiene solo domande e risposte create nella dashboard.
   let quizUserAnswers = [];
+  // Conteggio delle lettere A/B/C/D selezionate nel test (Risposta Automatica)
+  let quizLetterCounts = {};
+  // Esito del calcolo della lettera prevalente { counts, max, winners[] }
+  let quizDominantResult = null;
   let contactCurrentStep = 1;
   // Step fissi del modulo contatto: nome, cognome, email, telefono, messaggio, servizio, privacy
   let contactFixedSteps = 7;
@@ -262,12 +266,37 @@
       // Aggiorna sempre (anche con lista vuota): le domande arrivano solo dalla dashboard.
       window.dynamicQuizQuestions = active.map((q, i) => ({
         id: q.id || i + 1, text: q.text,
-        options: (q.answers || []).map(a => ({ text: a.text }))
+        options: (q.answers || []).map((a, j) => ({
+          text: a.text,
+          // Lettera A/B/C/D… in base alla posizione della risposta nella domanda
+          letter: String.fromCharCode(65 + j)
+        }))
       }));
       console.log('✅ Domande test dinamiche caricate dal database:', active.length);
     } catch (error) {
       console.warn('⚠️ Domande test dinamiche non disponibili', error);
     }
+    // Risposta Automatica: le 4 risposte personalizzate (A–D) configurate nella
+    // Dashboard Admin → Test gratuito → "Risposta Automatica" (Firestore:
+    // collection 'config', documento 'site_config', campo quiz.autoAnswers).
+    try {
+      const cfgSnap = await fsGetDocSafe('config', 'site_config');
+      if (cfgSnap && cfgSnap.exists) {
+        const cfg = cfgSnap.data() || {};
+        const auto = cfg.quiz && cfg.quiz.autoAnswers;
+        if (auto) {
+          window.__quizAutoAnswers = { A: auto.A || '', B: auto.B || '', C: auto.C || '', D: auto.D || '' };
+        }
+      }
+    } catch (e) { console.warn('⚠️ Risposte automatiche non disponibili', e); }
+  }
+
+  // GET singolo documento con toleranza agli errori (restituisce null se assente/fallisce)
+  async function fsGetDocSafe(colName, docId) {
+    if (!window.firebaseDB || !window.firebaseDoc || !window.firebaseGetDoc) return null;
+    try {
+      return await window.firebaseGetDoc(window.firebaseDoc(window.firebaseDB, colName, docId));
+    } catch (e) { return null; }
   }
 
   // Pacchetti di default: se la dashboard non ha ancora popolato 'service_packages',
@@ -475,6 +504,12 @@
         id: q.id || i + 1, text: q.text,
         options: q.answers?.map(a => ({ text: a.text })) || []
       }));
+    }
+    // Risposta Automatica (Dashboard Admin → Test gratuito): se il config
+    // contiene le risposte A–D, rendile disponibili al popup del test.
+    if (config.quiz?.autoAnswers) {
+      const aa = config.quiz.autoAnswers;
+      window.__quizAutoAnswers = { A: aa.A || '', B: aa.B || '', C: aa.C || '', D: aa.D || '' };
     }
     // I profili A–D non vengono più utilizzati: il test gratuito contiene
     // esclusivamente le domande e le risposte create nella dashboard.
@@ -1276,11 +1311,17 @@
     const userEmail = mailEl?.value?.trim() || '';
     const userPhone = phoneEl?.value?.trim() || '';
     const userMsg = msgEl?.value?.trim() || '';
+    // Consenso comunicazioni promozionali (checkbox facoltativo, deselezionato di default)
+    const marketingEl = document.getElementById('contact-marketing');
+    const consensoMarketing = marketingEl && marketingEl.checked
+      ? 'SÌ – Consenso prestato'
+      : 'NO – Consenso non prestato';
     const templateParams = {
       name: fullName,
       email: userEmail,
       phone: userPhone,
-      message: userMsg
+      message: userMsg,
+      consenso_marketing: `CONSENSO COMUNICAZIONI PROMOZIONALI\nStato del consenso: ${consensoMarketing}`
     };
 
     // Salvataggio della richiesta nel database (disponibile nella dashboard admin)
@@ -1479,10 +1520,73 @@
     if (!showProgress && bar) bar.style.width = '0%';
   }
 
+  function handleQuizAnswer(answerText, optIndex) {
+    // Memorizza la domanda con la risposta effettivamente selezionata
+    const currentQuestion = getQuizQuestions()[quizCurrentStep];
+    if (currentQuestion) {
+      quizUserAnswers.push({ question: currentQuestion.text, answer: answerText || '' });
+      // Risposta Automatica: registra la lettera (A/B/C/D…) della opzione scelta,
+      // cioè la posizione della risposta all'interno della domanda.
+      const letter = (typeof optIndex === 'number' && optIndex >= 0)
+        ? String.fromCharCode(65 + optIndex)
+        : '';
+      if (letter) quizLetterCounts[letter] = (quizLetterCounts[letter] || 0) + 1;
+    }
+    quizCurrentStep++;
+    const container = document.getElementById('quiz-question-container');
+    container.style.opacity = '0';
+    setTimeout(() => { renderQuizQuestion(); container.style.opacity = '1'; }, 250);
+  }
+
+  // --- RISPOSTA AUTOMATICA: calcolo della lettera prevalente (A/B/C/D) ---
+  // Restituisce { counts, max, winners[] }. "winners" contiene TUTTE le lettere
+  // con il punteggio massimo: se ha più di un elemento c'è un pareggio e NON
+  // viene assegnato alcun risultato arbitrario.
+  function computeQuizDominantLetter() {
+    const counts = {};
+    Object.keys(quizLetterCounts).forEach(L => { if (quizLetterCounts[L] > 0) counts[L] = quizLetterCounts[L]; });
+    const total = Object.values(counts).reduce((s, n) => s + n, 0);
+    if (!total) return { counts, max: 0, winners: [] };
+    const max = Math.max(...Object.values(counts));
+    const winners = Object.keys(counts).filter(L => counts[L] === max).sort();
+    return { counts, max, winners };
+  }
+
+  // Formatta i punteggi per l'email: "A: 3 · B: 1 · C: 2 · D: 0"
+  function formatQuizLetterCounts(counts) {
+    return ['A', 'B', 'C', 'D']
+      .map(L => L + ': ' + (counts[L] || 0))
+      .join(' · ');
+  }
+
+  // Mostra lo stato "risultato" nel popup con la risposta configurata nella
+  // Dashboard Admin (Firestore config/site_config → quiz.autoAnswers[lettera]).
+  function showQuizAutoResult(letter, text) {
+    const questionContainer = document.getElementById('quiz-question-container');
+    const resultContainer = document.getElementById('quiz-result-container');
+    const titleEl = document.getElementById('quiz-result-title');
+    const descEl = document.getElementById('quiz-result-description');
+    if (questionContainer) questionContainer.classList.add('hidden');
+    if (titleEl) titleEl.textContent = 'Il tuo risultato: ' + letter;
+    if (descEl) descEl.textContent = text;
+    if (resultContainer) { resultContainer.hidden = false; resultContainer.classList.add('visible'); }
+    setQuizHeader(false);
+    const counter = document.getElementById('quiz-step-counter');
+    if (counter) { counter.style.display = ''; counter.textContent = 'Risultato del test'; }
+    const box = document.querySelector('.quiz-modal-container');
+    if (box) setTimeout(() => box.scrollTo({ top: 0, behavior: 'smooth' }), 250);
+  }
+
+  function hideQuizAutoResult() {
+    const resultContainer = document.getElementById('quiz-result-container');
+    if (resultContainer) resultContainer.classList.remove('visible');
+  }
+
   function goQuizContactStep() {
     const questionContainer = document.getElementById('quiz-question-container');
     const contactSection = document.getElementById('quiz-contact-section');
     if (questionContainer) questionContainer.classList.add('hidden');
+    hideQuizAutoResult();
     setQuizHeader(false);
     const counter = document.getElementById('quiz-step-counter');
     if (counter) counter.textContent = 'I tuoi dati';
@@ -1524,7 +1628,7 @@
         const btn = document.createElement('button');
         btn.className = 'quiz-option-btn';
         btn.innerHTML = '<span class="quiz-option-text">' + opt.text + '</span><i class="fa-solid fa-chevron-right quiz-option-icon"></i>';
-        btn.addEventListener('click', function() { handleQuizAnswer(opt.text); });
+        btn.addEventListener('click', function() { handleQuizAnswer(opt.text, index); });
         optionsContainer.appendChild(btn);
       });
     }
@@ -1535,24 +1639,28 @@
     const contactSection = document.getElementById('quiz-contact-section');
     if (questionContainer) questionContainer.classList.remove('hidden');
     if (contactSection) contactSection.classList.add('hidden');
-  }
-
-  function handleQuizAnswer(answerText) {
-    // Memorizza la domanda con la risposta effettivamente selezionata
-    const currentQuestion = getQuizQuestions()[quizCurrentStep];
-    if (currentQuestion) {
-      quizUserAnswers.push({ question: currentQuestion.text, answer: answerText || '' });
-    }
-    quizCurrentStep++;
-    const container = document.getElementById('quiz-question-container');
-    container.style.opacity = '0';
-    setTimeout(() => { renderQuizQuestion(); container.style.opacity = '1'; }, 250);
+    hideQuizAutoResult();
   }
 
   function showQuizResults() {
-    const questionContainer = document.getElementById('quiz-question-container');
-    if (questionContainer) questionContainer.classList.add('hidden');
-    // Nessun profilo/result da calcolare: si passa direttamente al modulo dati.
+    // RISPOSTA AUTOMATICA: al termine del test si conta quale opzione
+    // (A, B, C o D) è stata selezionata più frequentemente e si mostra la
+    // risposta configurata nella Dashboard Admin per quella lettera.
+    const res = computeQuizDominantLetter();
+    quizDominantResult = res; // memorizzato: viene inviato anche via EmailJS
+    const autoAnswers = window.__quizAutoAnswers || {};
+    if (res.winners.length === 1) {
+      const letter = res.winners[0];
+      const text = (autoAnswers[letter] || '').trim();
+      if (text) {
+        showQuizAutoResult(letter, text);
+        return; // il modulo dati resta visibile sotto il risultato
+      }
+    }
+    // Nessun risultato univoco (nessuna risposta / pareggio tra due o più
+    // lettere con lo stesso punteggio massimo) oppure risposta non ancora
+    // configurata nella dashboard: nessun risultato assegnato arbitrariamente,
+    // si prosegue direttamente con il modulo dati come prima.
     goQuizContactStep();
   }
 
@@ -1592,12 +1700,35 @@
     const answersText = quizUserAnswers.length ? quizUserAnswers.map(function(item, i) {
       return 'DOMANDA ' + (i + 1) + ': ' + item.question + '\nRISPOSTA: ' + item.answer;
     }).join('\n\n') : '';
+    // Consenso comunicazioni promozionali (checkbox facoltativo, deselezionato di default)
+    const marketingEl = document.getElementById('quiz-contact-marketing');
+    const consensoMarketing = marketingEl && marketingEl.checked
+      ? 'SÌ – Consenso prestato'
+      : 'NO – Consenso non prestato';
+    // RISPOSTA AUTOMATICA: esito del calcolo delle lettere A/B/C/D. Viene sempre
+    // inviato un valore esplicito, così l'email resta leggibile in ogni caso.
+    let risultatoTest = 'Nessun risultato: test senza risposte registrate.';
+    if (quizDominantResult) {
+      const dr = quizDominantResult;
+      if (dr.winners.length === 1) {
+        const L = dr.winners[0];
+        const autoText = ((window.__quizAutoAnswers || {})[L] || '').trim();
+        risultatoTest = 'Risposta Automatica (' + L + '): ' + (autoText || '(risposta non ancora configurata nella Dashboard Admin)')
+          + '\nPunteggi: ' + formatQuizLetterCounts(dr.counts);
+      } else if (dr.winners.length > 1) {
+        risultatoTest = 'Pareggio tra le opzioni ' + dr.winners.join(' e ')
+          + ' (' + dr.max + ' risposte ciascuna): nessun risultato assegnato.'
+          + '\nPunteggi: ' + formatQuizLetterCounts(dr.counts);
+      }
+    }
     const templateParams = {
       name: document.getElementById('quiz-contact-name').value.trim(),
       email: document.getElementById('quiz-contact-email').value.trim(),
       phone: document.getElementById('quiz-contact-phone').value.trim() || 'Non specificato',
       answers: answersText,
       message: document.getElementById('quiz-contact-message').value.trim(),
+      risultato_test: risultatoTest,
+      consenso_marketing: `CONSENSO COMUNICAZIONI PROMOZIONALI\nStato del consenso: ${consensoMarketing}`,
       sent_from: window.location.href,
       date: new Date().toLocaleString('it-IT'),
       form_type: 'Quiz + Contatti'
@@ -1616,6 +1747,8 @@
         if (quizForm) quizForm.reset();
         quizCurrentStep = 0;
         quizUserAnswers = [];
+        quizLetterCounts = {};
+        quizDominantResult = null;
         ['quiz-error-name','quiz-error-email','quiz-error-message','quiz-error-phone'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=''; });
         document.querySelectorAll('#quiz-contact-form label.error').forEach(l => l.classList.remove('error'));
         const box = document.querySelector('.quiz-modal-container');
@@ -1691,6 +1824,9 @@
     ['quiz-error-name','quiz-error-email','quiz-error-message','quiz-error-phone'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=''; });
     document.querySelectorAll('#quiz-contact-form label.error').forEach(l => l.classList.remove('error'));
     quizUserAnswers = [];
+    quizLetterCounts = {};
+    quizDominantResult = null;
+    hideQuizAutoResult();
     const questionContainer = document.getElementById('quiz-question-container');
     const contactSection = document.getElementById('quiz-contact-section');
     const successState = document.getElementById('quiz-success');
