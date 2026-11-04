@@ -431,14 +431,12 @@ Scopri il metodo P.E.R.S.M.A.R.T. e i percorsi di coaching in studio e online.">
     
     <!-- ============ TEST BAND ============ -->
 
-    <section class="section">
-      
-
+    <section class="section" id="test">
       <div class="container">
         <div class="test-band reveal">
           <div>
             <h2>Dove si bloccano i tuoi obiettivi?</h2>
-            <p>A volte sai cosa vuoi, ma qualcosa ti impedisce di fare il passo successivo. Scopri quali meccanismi potrebbero frenarti e cosa puoi fare per iniziare a cambiare.<br><br><strong>Test completamente gratuito · Ricevi una risposta personalizzata e unica, costruita sulle tue risposte · Nessun costo nascosto</strong> </p>
+            <p>A volte sai cosa vuoi, ma qualcosa ti impedisce di fare il passo successivo. Scopri quali meccanismi potrebbero frenarti e cosa puoi fare per iniziare a cambiare.<br><br><strong>Test completamente gratuito · Ricevi una risposta immediata · Nessun costo nascosto</strong> </p>
           </div>
           <div class="actions">
             <button type="button" id="iniziatquiz" class="btn btn--uiverse btn--light">Inizia il test gratuito</button>
@@ -1267,16 +1265,24 @@ Scopri il metodo P.E.R.S.M.A.R.T. e i percorsi di coaching in studio e online.">
       <!-- Stato: risultato automatico (mostra la "Risposta Automatica" configurata
            nella Dashboard Admin in base alla lettera A/B/C/D prevalente).
            NON ha il "hidden" di default: è nascosto dalla classe .quiz-result-container
-           senza .visible (display:none), quindi riappare solo quando lo mostra script.js. -->
+           senza .visible (display:none), quindi riappare solo quando lo mostra script.js.
+           Il box verde (#315b55) contiene titolo, descrizione e nota: testo bianco,
+           radius 16px e ombra. Sotto, in un'unica riga centrata: "Prenota una consulenza"
+           (sinistra) + "Chiudi" (destra). -->
       <div class="quiz-result-container" id="quiz-result-container">
-        <div class="quiz-result-badge"><i class="fa-solid fa-compass"></i></div>
-        <h3 class="serif" id="quiz-result-title"></h3>
-        <p class="quiz-result-description" id="quiz-result-description"></p>
-        <p class="quiz-result-note">Risultato esplorativo, non diagnostico.</p>
-        <!-- Bottone che apre il modulo di prenotazione (stesso modulo del pulsante "Prenota") -->
-        <button type="button" id="quiz-book-consultation-btn" class="btn btn--uiverse btn--forest quiz-book-btn">
-          Prenota una consulenza <i class="fa-solid fa-calendar-check" aria-hidden="true"></i>
-        </button>
+        <div class="quiz-result-box">
+          <div class="quiz-result-badge"><i class="fa-solid fa-compass"></i></div>
+          <h3 class="serif" id="quiz-result-title"></h3>
+          <p class="quiz-result-description" id="quiz-result-description"></p>
+          <p class="quiz-result-note">Risultato esplorativo, non diagnostico.</p>
+        </div>
+        <!-- Azioni: un solo bottone prenota + chiudi, allineati al centro -->
+        <div class="quiz-result-actions">
+          <button type="button" id="quiz-book-consultation-btn" class="btn btn--uiverse btn--forest quiz-book-btn">
+            Prenota una consulenza
+          </button>
+          <button type="button" id="quiz-result-close-btn" class="btn btn--uiverse btn--light quiz-success-close">Chiudi</button>
+        </div>
       </div>
 
       <!-- Modulo dati da compilare: compare PRIMA del risultato (dopo le domande) -->
@@ -1316,19 +1322,23 @@ Scopri il metodo P.E.R.S.M.A.R.T. e i percorsi di coaching in studio e online.">
               <span>Acconsento a ricevere comunicazioni promozionali, aggiornamenti e offerte sui servizi di Valeria Moretti tramite email.</span>
             </label>
           </div>
-          <button type="submit" id="quiz-submit-btn" class="btn btn--uiverse btn--forest quiz-submit-button">Continua e vedi il risultato <i class="fa-solid fa-seedling"></i></button>
+          <button type="submit" id="quiz-submit-btn" class="btn btn--uiverse btn--forest quiz-submit-button">Continua e vedi il risultato</button>
         </form>
       </div>
 
-      <!-- Stato: inviato -->
+      <!-- Stato: inviato. Se il risultato è già stato mostrato sopra, qui restano
+           solo un bottone "Prenota una consulenza" (sinistra) + "Chiudi" (destra),
+           allineati al centro con gap. -->
       <div class="quiz-success" id="quiz-success">
         <div class="quiz-success-icon"><i class="fa-solid fa-circle-check"></i></div>
         <h3>Richiesta inviata!</h3>
         <p id="quiz-success-message">Grazie! Riceverai la risposta entro 24 ore nella tua email.</p>
-        <button type="button" id="quiz-book-consultation-btn-2" class="btn btn--uiverse btn--forest quiz-book-btn">
-          Prenota una consulenza <i class="fa-solid fa-calendar-check" aria-hidden="true"></i>
-        </button>
-        <button type="button" id="quiz-success-close-btn" class="btn btn--uiverse btn--light quiz-success-close">Chiudi</button>
+        <div class="quiz-result-actions">
+          <button type="button" id="quiz-book-consultation-btn-2" class="btn btn--uiverse btn--forest quiz-book-btn">
+            Prenota una consulenza
+          </button>
+          <button type="button" id="quiz-success-close-btn" class="btn btn--uiverse btn--light quiz-success-close">Chiudi</button>
+        </div>
       </div>
     </div>
   </div>

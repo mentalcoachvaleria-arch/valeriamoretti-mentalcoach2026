@@ -1689,16 +1689,32 @@
     const counterS = document.getElementById('quiz-step-counter');
     if (counterS) { counterS.style.display = ''; counterS.textContent = 'Risultato del test'; }
     if (msgEl && message) msgEl.textContent = message;
+    const successIcon = document.querySelector('#quiz-success .quiz-success-icon');
+    const successTitle = document.querySelector('#quiz-success h3');
     if (quizPendingResult && resultContainer) {
-      // Risultato visibile insieme alla conferma di avvenuto invio
+      // Risultato visibile INSERITO dentro il box verde (#315b55): titolo,
+      // descrizione e nota in bianco. La conferma "Richiesta inviata!" viene
+      // nascosta per non duplicare i bottoni: resta solo la riga azioni del
+      // risultato (Prenota + Chiudi).
       if (titleEl) titleEl.textContent = 'Il tuo risultato: ' + quizPendingResult.letter;
       if (descEl) descEl.textContent = quizPendingResult.text;
       resultContainer.hidden = false;
       resultContainer.classList.add('visible');
+      if (successIcon) successIcon.style.display = 'none';
+      if (successTitle) successTitle.style.display = 'none';
+      if (msgEl) msgEl.style.display = 'none';
+      const actions2 = document.querySelector('#quiz-success .quiz-result-actions');
+      if (actions2) actions2.style.display = 'none';
     } else if (resultContainer) {
       resultContainer.classList.remove('visible');
       resultContainer.hidden = true;
       if (counterS) counterS.textContent = 'Invio completato';
+      // Nessun risultato da mostrare: torna visibile la sola conferma di invio
+      if (successIcon) successIcon.style.display = '';
+      if (successTitle) successTitle.style.display = '';
+      if (msgEl) msgEl.style.display = '';
+      const actions2 = document.querySelector('#quiz-success .quiz-result-actions');
+      if (actions2) actions2.style.display = '';
     }
     if (successState) successState.classList.add('visible');
     const box = document.querySelector('.quiz-modal-container');
@@ -1939,6 +1955,9 @@
     if (quizCloseBtn) quizCloseBtn.addEventListener('click', closeQuizModal);
     const quizSuccessCloseBtn = document.getElementById('quiz-success-close-btn');
     if (quizSuccessCloseBtn) quizSuccessCloseBtn.addEventListener('click', closeQuizModal);
+    // "Chiudi" accanto a "Prenota una consulenza" nella schermata risultato
+    const quizResultCloseBtn = document.getElementById('quiz-result-close-btn');
+    if (quizResultCloseBtn) quizResultCloseBtn.addEventListener('click', closeQuizModal);
     // Bottoni "Prenota una consulenza" nel popup del test: aprono il modulo prenota.
     // Il form del test viene tenuto aperto finché l'utente non chiude il popup,
     // così i campi restano visibili e i dati servono a precompilare il modulo.
